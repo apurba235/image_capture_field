@@ -19,8 +19,10 @@ class ImageCaptureField extends StatelessWidget {
     this.iconEdit = Icons.edit,
     this.iconCamera = Icons.camera_alt,
     this.iconGallery = Icons.photo,
-  })  : controller = controller ?? ImageCaptureController(),
-        super(key: key);
+    this.placeholderBuilder,
+    this.imageBuilder,
+  }) : controller = controller ?? ImageCaptureController(),
+       super(key: key);
 
   ///this will give you the path of the image when you are selecting any image
   final Function(String? onChanged)? onImagePathChanged;
@@ -70,16 +72,26 @@ class ImageCaptureField extends StatelessWidget {
   ///this id to change gallery icon of this widget
   final IconData iconGallery;
 
+  ///custom builder before capturing or selecting an image.
+  ///It provides a [pickImage] callback to trigger camera/gallery selection.
+  final Widget Function(BuildContext context, VoidCallback pickImage)? placeholderBuilder;
+
+  ///custom builder after capturing or selecting an image.
+  ///It provides [imageData], a [pickImage] callback (to pick again) and a [clearImage] callback.
+  final Widget Function(
+    BuildContext context,
+    Uint8List imageData,
+    VoidCallback pickImage,
+    VoidCallback clearImage,
+  )? imageBuilder;
+
   final _picker = ImagePicker();
   final Rx<bool> _showLoading = false.obs;
 
   @override
   Widget build(BuildContext context) {
     updateImageWOCropper(ImageSource imageSource) async {
-      XFile? pickedFile = await _picker.pickImage(
-        source: imageSource,
-        imageQuality: imageQuality,
-      );
+      XFile? pickedFile = await _picker.pickImage(source: imageSource, imageQuality: imageQuality);
 
       controller.updatePickedImage(await pickedFile?.readAsBytes(), pickedFile?.path);
       onImagePathChanged?.call(pickedFile?.path);
@@ -112,71 +124,90 @@ class ImageCaptureField extends StatelessWidget {
       if (!kIsWeb) Navigator.of(context).pop();
     }
 
-    return Obx(() {
-      return InkWell(
-        onTap: () async {
-          if (kIsWeb) {
-            includeCropper
-                ? updateImageWithCropper(ImageSource.gallery)
-                : updateImageWOCropper(ImageSource.gallery);
-          } else {
-            showModalBottomSheet(
-              context: context,
-              builder: (ctx) {
-                return OpenWithCameraOrGallery(
-                  iconBackgroundColor: iconBackgroundColor,
-                  onTapCamera: () {
-                    includeCropper
-                        ? updateImageWithCropper(ImageSource.camera)
-                        : updateImageWOCropper(ImageSource.camera);
-                  },
-                  onTapGallery: () {
-                    includeCropper
-                        ? updateImageWithCropper(ImageSource.gallery)
-                        : updateImageWOCropper(ImageSource.gallery);
-                  },
-                  iconCamera: iconCamera,
-                  iconGallery: iconGallery,
-                );
+    void pickImage() {
+      if (kIsWeb) {
+        includeCropper
+            ? updateImageWithCropper(ImageSource.gallery)
+            : updateImageWOCropper(ImageSource.gallery);
+      } else {
+        showModalBottomSheet(
+          context: context,
+          builder: (ctx) {
+            return OpenWithCameraOrGallery(
+              iconBackgroundColor: iconBackgroundColor,
+              onTapCamera: () {
+                includeCropper
+                    ? updateImageWithCropper(ImageSource.camera)
+                    : updateImageWOCropper(ImageSource.camera);
               },
+              onTapGallery: () {
+                includeCropper
+                    ? updateImageWithCropper(ImageSource.gallery)
+                    : updateImageWOCropper(ImageSource.gallery);
+              },
+              iconCamera: iconCamera,
+              iconGallery: iconGallery,
             );
-          }
-        },
-        child: _showLoading.value
-            ? Center(child: Text('LOADING...'))
-            : Stack(
-                children: [
-                  Material(
-                    borderRadius: BorderRadius.all(Radius.circular(borderRadiusValue)),
-                    clipBehavior: Clip.hardEdge,
-                    elevation: 6,
-                    child: Container(
-                      alignment: Alignment.bottomRight,
-                      width: width,
-                      height: height,
-                      constraints: BoxConstraints(minWidth: 60, minHeight: 60),
-                      decoration: BoxDecoration(color: Colors.grey),
-                      child: (controller.isBlank && initialImage == null)
-                          ? null
-                          : controller.isBlank
-                              ? initialImage!
-                              : Image(image: MemoryImage(controller.imageData!)),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: bottomRightDistance,
-                    right: bottomRightDistance,
-                    child: CircleAvatar(
-                      backgroundColor: iconBackgroundColor,
-                      radius: 20,
-                      child: Icon(
-                        iconEdit,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
+          },
+        );
+      }
+    }
+
+    void clearImage() {
+      controller.clear();
+      onImagePathChanged?.call(null);
+      onImageBytesChanged?.call(null);
+    }
+
+    return Obx(() {
+      if (_showLoading.value) {
+        return const Center(child: Text('LOADING...'));
+      }
+
+      final isBlank = controller.isBlank;
+
+      if (isBlank) {
+        if (placeholderBuilder != null) {
+          return placeholderBuilder!(context, pickImage);
+        }
+      } else {
+        if (imageBuilder != null) {
+          return imageBuilder!(context, controller.imageData!, pickImage, clearImage);
+        }
+      }
+
+      return InkWell(
+        onTap: pickImage,
+        child: Stack(
+          children: [
+            Material(
+              borderRadius: BorderRadius.all(Radius.circular(borderRadiusValue)),
+              clipBehavior: Clip.hardEdge,
+              elevation: 6,
+              child: Container(
+                alignment: Alignment.bottomRight,
+                width: width,
+                height: height,
+                constraints: const BoxConstraints(minWidth: 60, minHeight: 60),
+                decoration: const BoxDecoration(color: Colors.grey),
+                child: (isBlank && initialImage == null)
+                    ? null
+                    : isBlank
+                    ? initialImage!
+                    : Image(image: MemoryImage(controller.imageData!)),
               ),
+            ),
+            Positioned(
+              bottom: bottomRightDistance,
+              right: bottomRightDistance,
+              child: CircleAvatar(
+                backgroundColor: iconBackgroundColor,
+                radius: 20,
+                child: Icon(iconEdit, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
       );
     });
   }

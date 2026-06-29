@@ -30,7 +30,7 @@ class OpenWithCameraOrGallery extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(5, 0, 5, 25),
               child: Text(
                 'Open with',
-                textScaleFactor: 1.2,
+                textScaler: const TextScaler.linear(1.2),
                 style: const TextStyle(
                     color: Colors.white, fontWeight: FontWeight.bold),
               ),
@@ -87,7 +87,7 @@ class OpenWithButton extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             iconName,
-            textScaleFactor: 0.9,
+            textScaler: const TextScaler.linear(0.9),
             style: const TextStyle(
               color: Colors.white,
             ),

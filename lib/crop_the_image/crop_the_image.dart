@@ -33,8 +33,13 @@ class CropTheImage extends StatelessWidget {
               controller: _controller,
               aspectRatio: aspectRatio,
               onCropped: (image) {
-                outputImageData.value = image;
-                _controller.area = Rect.largest;
+                switch(image) {
+                  case CropSuccess():
+                    outputImageData.value = CropSuccess(image.croppedImage).croppedImage;
+                    _controller.area = Rect.largest;
+                  case CropFailure():
+                    throw UnimplementedError();
+                }
                 // _controller.aspectRatio = 1;
                 // do something with image data
               },
@@ -51,7 +56,7 @@ class CropTheImage extends StatelessWidget {
                           },
                           style: ButtonStyle(
                               backgroundColor:
-                                  MaterialStateProperty.resolveWith(
+                                  WidgetStateProperty.resolveWith(
                                       (states) => Colors.deepOrangeAccent)),
                           icon: Icon(Icons.crop),
                           label: Text('CROP'),
@@ -62,7 +67,7 @@ class CropTheImage extends StatelessWidget {
                           },
                           style: ButtonStyle(
                               backgroundColor:
-                                  MaterialStateProperty.resolveWith(
+                                  WidgetStateProperty.resolveWith(
                                       (states) => Colors.green)),
                           icon: Icon(Icons.done),
                           label: Text('Done'),
